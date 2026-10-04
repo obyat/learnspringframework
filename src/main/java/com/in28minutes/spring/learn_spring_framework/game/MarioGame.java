@@ -2,7 +2,13 @@ package com.in28minutes.spring.learn_spring_framework.game;
 
 import org.springframework.stereotype.Component;
 
-
+/**
+ * One concrete {@link Game} implementation.
+ *
+ * <p>{@code @Component} makes this class discoverable during component scanning. Spring creates
+ * one singleton bean by default, named {@code marioGame}, and can inject it wherever a
+ * {@code Game} is required.</p>
+ */
 @Component
 public class MarioGame implements Game {
 
