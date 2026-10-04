@@ -1,5 +1,6 @@
 package com.in28minutes.spring.learn_spring_framework;
 
+import com.in28minutes.spring.learn_spring_framework.enterprise.example.web.MyWebController;
 import com.in28minutes.spring.learn_spring_framework.game.GameRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -30,7 +31,11 @@ public class LearnSpringFrameworkApplication {
 				SpringApplication.run(LearnSpringFrameworkApplication.class, args);
 
 		printIocContainer(context);
-		context.getBean(GameRunner.class).run();
+		GameRunner runner = context.getBean(GameRunner.class);
+		runner.run();
+
+		MyWebController controller = context.getBean(MyWebController.class);
+		System.out.println(controller.returnValueFromBusinessService());
 	}
 
 	/**
@@ -50,5 +55,8 @@ public class LearnSpringFrameworkApplication {
 		Arrays.stream(context.getBeanDefinitionNames())
 				.sorted()
 				.forEach(beanName -> System.out.printf("  - %s%n", beanName));
+
+
+
 	}
 }
