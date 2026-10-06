@@ -1,14 +1,18 @@
-package com.in28minutes.spring.learn_spring_framework.game;
+package com.in28minutes.spring.learn_spring_framework.enterprise.example.service;
 
+import com.in28minutes.spring.learn_spring_framework.enterprise.example.model.Game;
+import com.in28minutes.spring.learn_spring_framework.enterprise.example.model.SuperContraGame;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
  * A Spring-managed bean that uses a {@link Game}.
  *
- * <p>This class demonstrates field injection. Spring creates this bean, finds the
- * registered {@code Game} implementation ({@link MarioGame}), and assigns it to the
- * annotated field after construction.</p>
+ * <p>This class demonstrates field injection. Spring creates this bean, resolves a
+ * matching {@code Game}, and assigns it to the annotated field after construction.
+ * Multiple {@code Game} beans exist in this project, so {@link SuperContraGame} is
+ * selected because it is marked {@code @Primary}. A {@code @Qualifier} could select
+ * a specific alternative instead.</p>
  */
 @Component
 public class GameRunner {

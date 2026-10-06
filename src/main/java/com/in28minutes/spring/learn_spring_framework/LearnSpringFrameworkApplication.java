@@ -1,12 +1,15 @@
 package com.in28minutes.spring.learn_spring_framework;
 
 import com.in28minutes.spring.learn_spring_framework.enterprise.example.web.MyWebController;
-import com.in28minutes.spring.learn_spring_framework.game.GameRunner;
+import com.in28minutes.spring.learn_spring_framework.enterprise.example.service.GameRunner;
+import com.in28minutes.spring.learn_spring_framework.functionalprogramming.FP01Structured;
+import com.in28minutes.spring.learn_spring_framework.functionalprogramming.FP02Optional;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
-import java.util.Arrays;
+import java.util.List;
+
 
 /**
  * Application entry point for this learning project.
@@ -32,11 +35,13 @@ public class LearnSpringFrameworkApplication {
 
 		printIocContainer(context);
 		GameRunner runner = context.getBean(GameRunner.class);
-		runner.run();
-
+//		runner.run();
 		MyWebController controller = context.getBean(MyWebController.class);
 		System.out.println(controller.returnValueFromBusinessService());
+
+
 	}
+
 
 	/**
 	 * Prints information about the Spring IoC container for learning and debugging.
@@ -47,14 +52,7 @@ public class LearnSpringFrameworkApplication {
 	 */
 	private static void printIocContainer(ConfigurableApplicationContext context) {
 		System.out.printf("%n=== Spring IoC Container ===%n");
-		System.out.printf("Container type: %s%n", context.getClass().getSimpleName());
-		System.out.printf("Context ID: %s%n", context.getId());
-		System.out.printf("Registered bean definitions: %d%n", context.getBeanDefinitionCount());
-		System.out.println("Bean definitions:");
 
-		Arrays.stream(context.getBeanDefinitionNames())
-				.sorted()
-				.forEach(beanName -> System.out.printf("  - %s%n", beanName));
 
 
 

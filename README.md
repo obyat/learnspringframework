@@ -11,24 +11,296 @@ It currently demonstrates:
 - Programming to an interface (`Game`) rather than a concrete class (`MarioGame`)
 - A full-context Spring Boot test
 
-## Completed Spring Core topics
+## Spring Core and Boot: interview quick reference
 
-- IoC ✅
-- ApplicationContext ✅
-- Beans ✅
-- Dependency Injection ✅
-- Constructor Injection ✅
-- Field vs Constructor DI ✅
-- `@Component` / stereotypes ✅
-- `@ComponentScan` ✅
-- `@Configuration` ✅
-- `@Bean` ✅
-- `@Qualifier` ✅
-- `@Primary` ✅
-- `@SpringBootConfiguration` ✅
-- `@EnableAutoConfiguration` ✅
-- `@SpringBootApplication` ✅
-- Spring Boot startup basics ✅
+Use this pattern when answering an interview question: define the concept, explain
+what Spring does, name the trade-off, and tie it to a small example. The detailed
+[Spring fundamentals](docs/01-spring-fundamentals.md) guide goes deeper; this
+section is designed to be practiced aloud.
+
+### Code map in this repository
+
+- [GameRunner](src/main/java/com/in28minutes/spring/learn_spring_framework/game/GameRunner.java)
+  demonstrates **field injection**.
+- [MyWebController](src/main/java/com/in28minutes/spring/learn_spring_framework/enterprise/example/web/MyWebController.java)
+  demonstrates **constructor injection**, the preferred choice for required
+  dependencies.
+- [BusinessService](src/main/java/com/in28minutes/spring/learn_spring_framework/enterprise/example/business/BusinessService.java)
+  demonstrates **setter injection**.
+- [SuperContraGame](src/main/java/com/in28minutes/spring/learn_spring_framework/game/SuperContraGame.java)
+  is the default `Game` because it is marked `@Primary`.
+
+### IoC, `ApplicationContext`, and beans ✅
+
+**Inversion of Control (IoC)** means Spring controls object creation, configuration,
+and wiring instead of application code doing it with `new`. **Dependency Injection
+(DI)** is the usual way Spring implements IoC: a class declares what it needs, and
+the container supplies it.
+
+A **bean** is an object created and lifecycle-managed by Spring. An object created
+with `new` is an ordinary Java object, not a Spring bean. The
+**`ApplicationContext`** is Spring's IoC container: it holds bean definitions,
+creates beans, resolves dependencies, manages lifecycle callbacks, and adds
+features such as events, messages, and resource loading.
+
+```java
+ConfigurableApplicationContext context =
+        SpringApplication.run(LearnSpringFrameworkApplication.class, args);
+
+GameRunner runner = context.getBean(GameRunner.class); // Useful for this tutorial.
+```
+
+In normal application classes, do not call `getBean(...)`. Declare the dependency
+instead and let Spring inject it.
+
+> **Interview answer:** "IoC moves object creation and wiring into the
+> `ApplicationContext`. DI is the mechanism through which Spring supplies a bean's
+> collaborators, which reduces coupling and improves testability."
+
+### Dependency Injection and its styles ✅
+
+Spring usually resolves a dependency **by type**. For example, a class that depends
+on `Game` can receive any registered implementation of `Game`.
+
+#### Constructor injection - the default for required dependencies
+
+```java
+@Component
+class MyWebController {
+    private final BusinessService businessService;
+
+    MyWebController(BusinessService businessService) {
+        this.businessService = businessService;
+    }
+}
+```
+
+Use constructor injection for required collaborators because dependencies are
+explicit, can be `final`, and are easy to provide in a plain unit test. If a class
+has exactly one constructor, `@Autowired` is optional; Spring uses that constructor
+automatically.
+
+#### Field injection versus constructor injection
+
+```java
+// Field injection: works only when GameRunner itself is Spring-managed.
+@Autowired
+private Game game;
+```
+
+| Field injection | Constructor injection |
+| --- | --- |
+| Concise for a small demonstration. | Explicitly states required dependencies. |
+| The dependency is hidden and cannot be `final`. | Supports immutable fields. |
+| Plain unit tests need reflection or a Spring context. | A test can call `new MyWebController(fakeService)`. |
+| A manually created object can have a `null` field. | The object cannot be created without required dependencies. |
+
+`@Autowired` requests injection; it does **not** make the target type a bean. The
+containing class and its dependency must both be registered with Spring.
+
+#### Setter injection - for optional or reconfigurable dependencies
+
+```java
+@Autowired
+void setAuditService(AuditService auditService) {
+    this.auditService = auditService;
+}
+```
+
+Setter injection is useful when a dependency is genuinely optional or can change.
+Avoid it for required business dependencies because the object can exist before the
+setter has run.
+
+> **Interview answer:** "I default to constructor injection for required
+> dependencies. Field injection works, but it hides dependencies and makes testing
+> and immutability worse. I reserve setter injection for optional configuration."
+
+### `@Component`, stereotypes, and `@ComponentScan` ✅
+
+`@Component` marks a class for discovery during component scanning. The following
+stereotype annotations are specialized forms of `@Component` and communicate a
+class's role:
+
+```java
+@Service        // Business logic
+class PaymentService { }
+
+@Repository     // Data access; also participates in persistence exception translation
+class PaymentRepository { }
+
+@RestController // HTTP API endpoints
+class PaymentController { }
+```
+
+`@ComponentScan` tells Spring where to look for those classes:
+
+```java
+@Configuration
+@ComponentScan(basePackages = "com.example.payment")
+class PaymentConfiguration { }
+```
+
+In a Boot application, `@SpringBootApplication` performs a component scan from its
+own package through child packages. Put the application class in a common root
+package. Use an explicit scan only when you intentionally need another package:
+
+```java
+@SpringBootApplication(scanBasePackages = {
+        "com.example.app", "com.example.shared"
+})
+class Application { }
+```
+
+> **Interview answer:** "Component scanning discovers my annotated application
+> classes. It is different from Boot auto-configuration, which conditionally adds
+> framework infrastructure based on the classpath and configuration."
+
+### `@Configuration` and `@Bean` ✅
+
+Use `@Configuration` for a class that declares bean definitions. Use `@Bean` on a
+factory method when you need custom construction or need to register a third-party
+class that you cannot annotate.
+
+```java
+@Configuration
+class TimeConfiguration {
+
+    @Bean
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Bean
+    ReportService reportService(Clock clock) {
+        return new ReportService(clock);
+    }
+}
+```
+
+Spring manages each returned object; the method name is the default bean name.
+Method parameters are dependencies resolved by the container. Prefer component
+scanning for application classes you own and `@Bean` for external classes, factory
+logic, or deliberate configuration.
+
+> **Interview answer:** "`@Component` registers a class through scanning. `@Bean`
+> registers the object returned by a method, so it is ideal for a library class or
+> custom setup that I cannot express with `@Component`."
+
+### `@Primary` and `@Qualifier` ✅
+
+When more than one bean matches an injection type, Spring needs help choosing one.
+Without a choice, startup normally fails with `NoUniqueBeanDefinitionException`.
+
+`@Primary` declares the default candidate. This repository has three `Game`
+implementations, and `SuperContraGame` is selected by default:
+
+```java
+@Component
+@Primary
+class SuperContraGame implements Game {
+    // Default Game implementation
+}
+```
+
+`@Qualifier` selects a specific candidate at one injection point, even if another
+candidate is primary:
+
+```java
+@Component
+class GameRunner {
+    GameRunner(@Qualifier("marioGame") Game game) {
+        // Explicitly select the bean named marioGame.
+    }
+}
+```
+
+Use `@Primary` for an application-wide sensible default. Use `@Qualifier` when one
+consumer specifically needs a particular implementation.
+
+> **Interview answer:** "`@Primary` is a default preference; `@Qualifier` is an
+> explicit choice at the injection point. If neither resolves the ambiguity, Spring
+> fails fast rather than guessing."
+
+### Spring Boot configuration annotations ✅
+
+```text
+@SpringBootApplication
+  |-- @SpringBootConfiguration
+  |     `-- Boot's configuration-class variant of @Configuration
+  |-- @EnableAutoConfiguration
+  |     `-- conditionally configures Spring/third-party infrastructure
+  `-- @ComponentScan
+        `-- discovers annotated application components
+```
+
+**`@SpringBootConfiguration`** is Boot's configuration-class annotation. It is a
+Boot-specific alternative to `@Configuration` that helps Boot tests find the
+primary application configuration. You normally receive it indirectly through
+`@SpringBootApplication`, rather than placing it on every configuration class.
+
+**`@EnableAutoConfiguration`** asks Boot to configure likely infrastructure based
+on the classpath, properties, and beans you already define. For example, adding
+`spring-boot-starter-webmvc` allows Boot to configure MVC and an embedded server;
+your `@RestController` is still found by component scanning. Auto-configuration is
+conditional and usually backs off when you provide your own bean.
+
+**`@SpringBootApplication`** is the usual application entry-point annotation. It
+combines the three annotations above and exposes options such as
+`scanBasePackages` and auto-configuration exclusions.
+
+The explicit form below is conceptually equivalent, but the combined annotation is
+what you normally use:
+
+```java
+@SpringBootConfiguration
+@EnableAutoConfiguration
+@ComponentScan
+class ApplicationConfiguration { }
+```
+
+```java
+@SpringBootApplication
+public class LearnSpringFrameworkApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(LearnSpringFrameworkApplication.class, args);
+    }
+}
+```
+
+### Spring Boot startup basics ✅
+
+When `main` calls `SpringApplication.run(...)`, the high-level flow is:
+
+1. Boot creates and refreshes an appropriate `ApplicationContext` and prepares the
+   application environment.
+2. Spring processes the main configuration class, component scan, and applicable
+   conditional auto-configurations.
+3. Component scanning registers this project's beans, including `GameRunner`,
+   `MarioGame`, `PacMan`, and `SuperContraGame`.
+4. Spring resolves dependencies and creates required singleton beans. `GameRunner`
+   receives `SuperContraGame` for its `Game` field because `SuperContraGame` is
+   `@Primary`.
+5. Boot finishes refreshing the context and returns it from `run(...)`. This
+   learning application then retrieves `GameRunner` and runs it.
+
+> **Interview answer:** "`SpringApplication.run` bootstraps and refreshes the
+> `ApplicationContext`. During startup, Spring processes configuration, scans
+> components, evaluates conditional auto-configuration, resolves the dependency
+> graph, and creates the required beans."
+
+### Short interview drill
+
+Practice these answers without reading the notes:
+
+1. Why is constructor injection usually preferred to field injection?
+2. What is the difference between component scanning and auto-configuration?
+3. When would you choose `@Bean` instead of `@Component`?
+4. How do `@Primary` and `@Qualifier` resolve multiple beans of the same type?
+5. What does `@SpringBootApplication` combine, and why should it sit in a root
+   package?
+
+For every answer, name the trade-off and point to the matching example in this
+repository. That turns a definition into an interview-quality explanation.
 
 ## Spring Framework modules
 
@@ -193,13 +465,17 @@ ApplicationContext (Spring's IoC container)
   |
   +-- component scan finds @Component classes
   |     +-- MarioGame  -> bean named marioGame
+  |     +-- PacMan     -> bean named pacMan
+  |     +-- SuperContraGame -> bean named superContraGame (@Primary)
   |     +-- GameRunner -> bean named gameRunner
   |
-  +-- Spring injects MarioGame into GameRunner's @Autowired Game field
-          because it is the only Game bean
+  +-- Spring injects SuperContraGame into GameRunner's @Autowired Game field
+          because it is the default @Primary Game bean
 ```
 
-The source comments explain this flow in context. The documentation includes additional examples such as `@Qualifier`, `@Primary`, `@Bean`, profiles, REST testing, and AWS deployment choices without adding extra beans that would change this simple example's behavior.
+The source comments and interview quick reference explain this flow in context. The
+`Game` example deliberately contains multiple candidates so you can observe
+`@Primary`; the `@Qualifier` example above shows how to select a non-default bean.
 
 ## Important learning rule
 

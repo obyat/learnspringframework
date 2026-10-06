@@ -1,4 +1,7 @@
-package com.in28minutes.spring.learn_spring_framework.game;
+package com.in28minutes.spring.learn_spring_framework.enterprise.example.model;
+
+import com.in28minutes.spring.learn_spring_framework.enterprise.example.service.GameRunner;
+
 
 /**
  * A contract for a game that can move in four directions.

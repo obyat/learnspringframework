@@ -33,15 +33,17 @@ Spring Boot does not replace Spring Framework. It makes starting and operating S
 1. Java invokes main().
 2. SpringApplication.run(...) creates an ApplicationContext.
 3. Component scanning finds @Component classes.
-4. Spring registers MarioGame and GameRunner as bean definitions.
-5. Spring needs a Game to construct GameRunner.
-6. MarioGame is the only registered Game implementation, so Spring injects it.
+4. Spring registers MarioGame, PacMan, SuperContraGame, and GameRunner as bean definitions.
+5. Spring creates GameRunner and resolves its `@Autowired` Game field.
+6. Three Game implementations match, so SuperContraGame is selected because it is `@Primary`.
 7. The example retrieves GameRunner from the container and calls run().
 ```
 
-This is IoC: `main` does not call `new MarioGame()` and pass it to `new GameRunner(...)`. Spring owns that wiring.
+This is IoC: `main` does not create or wire a Game into GameRunner. Spring owns that wiring.
 
 ### Why `GameRunner` depends on `Game`
+
+The current `GameRunner` uses field injection to demonstrate that style. It still depends on the `Game` interface rather than a concrete implementation. The constructor-injected version below is the preferred production design:
 
 ```java
 public class GameRunner {
@@ -55,21 +57,21 @@ public class GameRunner {
 
 `GameRunner` depends on the interface, not on `MarioGame`. That makes the class less coupled and easier to test. A test can pass a fake `Game`; a configuration can choose a different real implementation.
 
-`MarioGame` is a bean because it has `@Component`. `PacMan` and `SuperContraGame` are ordinary Java classes in the current project, so Spring does not create them as beans.
+`MarioGame`, `PacMan`, and `SuperContraGame` are all beans because they have `@Component`. `SuperContraGame` is the default candidate because it also has `@Primary`; a `@Qualifier` can choose a specific alternative.
 
 ## 4. `@SpringBootApplication`
 
 `@SpringBootApplication` combines three annotations:
 
 ```java
-@Configuration
+@SpringBootConfiguration
 @EnableAutoConfiguration
 @ComponentScan
 ```
 
-You normally use the combined annotation on the application entry-point class.
+You normally use the combined annotation on the application entry-point class. `@SpringBootConfiguration` is Boot's configuration-class annotation and is a Boot-specific alternative to `@Configuration`.
 
-- `@Configuration` says the class can declare Spring bean definitions.
+- `@SpringBootConfiguration` identifies the primary Boot configuration class and lets it declare or import bean definitions.
 - `@EnableAutoConfiguration` lets Boot configure common infrastructure based on dependencies and properties.
 - `@ComponentScan` finds components in the application package and all child packages.
 
@@ -154,14 +156,14 @@ Setter injection makes sense when the dependency is optional or legitimately rec
 
 ## 7. What happens with multiple implementations?
 
-If you add `@Component` to both `MarioGame` and `PacMan`, Spring sees multiple beans of type `Game`. It cannot safely guess which one `GameRunner` wants, so startup fails with a `NoUniqueBeanDefinitionException`.
+This project already has three beans of type `Game`: `MarioGame`, `PacMan`, and `SuperContraGame`. `SuperContraGame` is `@Primary`, so it is selected by default. If you remove `@Primary` without adding a `@Qualifier`, Spring cannot safely guess which Game to inject and startup fails with a `NoUniqueBeanDefinitionException`.
 
 ### Option A: choose a default with `@Primary`
 
 ```java
 @Component
 @Primary
-class MarioGame implements Game {
+class SuperContraGame implements Game {
     // default Game implementation
 }
 ```
@@ -285,10 +287,10 @@ Aim for many unit tests, focused slice tests, and fewer full-context tests.
 
 ## 12. Exercises
 
-1. Before running the app, predict why `MarioGame` is selected for `GameRunner`.
-2. Add `@Component` to `PacMan`, run the app, and read the ambiguity error.
-3. Fix the ambiguity once with `@Primary`, then again with `@Qualifier`. Compare the trade-offs.
-4. Replace `MarioGame` with a test fake and unit-test `GameRunner` without starting Spring.
+1. Before running the app, predict why `SuperContraGame` is selected for `GameRunner`.
+2. Temporarily remove `@Primary` from `SuperContraGame`, run the app, and read the ambiguity error.
+3. Restore `@Primary`, then add a `@Qualifier` at the injection point to select a non-default Game. Compare the trade-offs.
+4. Create a constructor-injected GameRunner variation, replace its Game with a test fake, and unit-test it without starting Spring.
 5. Create a `@Configuration` class with a `@Bean` method for an object you cannot annotate.
 6. Add an `application-dev.properties` file and activate the `dev` profile.
 7. Add Spring Boot Actuator later and explain the difference between liveness and readiness probes.
